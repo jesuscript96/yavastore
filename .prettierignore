@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+.next
+coverage
+.cache
+*.log
+.env
+.env.*
+!.env.example
+!.env.local.example

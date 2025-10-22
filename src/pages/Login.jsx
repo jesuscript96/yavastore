@@ -1,0 +1,143 @@
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
+import { useAuthStore } from '../store/authStore'
+import toast from 'react-hot-toast'
+import LoadingSpinner from '../components/LoadingSpinner'
+
+export default function Login() {
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const { signIn } = useAuthStore()
+  const navigate = useNavigate()
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors }
+  } = useForm()
+
+  const onSubmit = async (data) => {
+    setLoading(true)
+    try {
+      const { error } = await signIn(data.email, data.password)
+      
+      if (error) {
+        toast.error(error.message)
+      } else {
+        toast.success('Inicio de sesión exitoso')
+        navigate('/')
+      }
+    } catch (error) {
+      toast.error('Error al iniciar sesión')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h1 className="text-center text-3xl font-bold text-primary-600 mb-2">Yava</h1>
+          <h2 className="text-center text-2xl font-bold text-gray-900">
+            Iniciar Sesión
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Accede a tu panel de gestión de delivery
+          </p>
+        </div>
+        
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Email
+              </label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  {...register('email', {
+                    required: 'El email es requerido',
+                    pattern: {
+                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                      message: 'Email inválido'
+                    }
+                  })}
+                  type="email"
+                  className={`input pl-10 ${errors.email ? 'input-error' : ''}`}
+                  placeholder="tu@email.com"
+                />
+              </div>
+              {errors.email && (
+                <p className="mt-1 text-sm text-danger-600">{errors.email.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Contraseña
+              </label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  {...register('password', {
+                    required: 'La contraseña es requerida',
+                    minLength: {
+                      value: 6,
+                      message: 'La contraseña debe tener al menos 6 caracteres'
+                    }
+                  })}
+                  type={showPassword ? 'text' : 'password'}
+                  className={`input pl-10 pr-10 ${errors.password ? 'input-error' : ''}`}
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="mt-1 text-sm text-danger-600">{errors.password.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full"
+            >
+              {loading ? (
+                <LoadingSpinner size="sm" className="mr-2" />
+              ) : null}
+              Iniciar Sesión
+            </button>
+          </div>
+
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              ¿No tienes cuenta?{' '}
+              <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
+                Regístrate aquí
+              </Link>
+            </p>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
