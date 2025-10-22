@@ -34,7 +34,7 @@ async function findBusinessByWebhookSecret(webhookSecret) {
   try {
     const { data, error } = await supabaseAdmin
       .from('businesses')
-      .select('id, name, stripe_webhook_secret')
+      .select('id, name, stripe_webhook_secret, stripe_signing_secret')
       .eq('stripe_webhook_secret', webhookSecret)
       .single()
 
@@ -61,8 +61,12 @@ async function verifyWebhookSignature(rawBody, signature, webhookSecret) {
       throw new Error('Business not found for webhook secret')
     }
 
-    // Verify the signature using the business's webhook secret
-    const event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
+    if (!business.stripe_signing_secret) {
+      throw new Error('Business has no Stripe signing secret configured')
+    }
+
+    // Verify the signature using the business's Stripe signing secret
+    const event = stripe.webhooks.constructEvent(rawBody, signature, business.stripe_signing_secret)
     
     return { event, business }
   } catch (error) {
