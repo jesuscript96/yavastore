@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { supabase } from '../lib/supabase'
 import { Copy, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function WebhookConfig() {
   const { user } = useAuthStore()
@@ -56,9 +57,43 @@ export default function WebhookConfig() {
       // Usar la URL de producción para Netlify Functions
       const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin
       setWebhookUrl(`${baseUrl}/.netlify/functions/stripe-webhook?secret=${newSecret}`)
+      toast.success('Webhook secret generado correctamente')
     } catch (error) {
       console.error('Error generating webhook secret:', error)
-      alert('Error al generar el webhook secret')
+      toast.error('Error al generar el webhook secret')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const saveWebhookSecret = async () => {
+    if (!webhookSecret) {
+      toast.error('Por favor ingresa un webhook secret')
+      return
+    }
+
+    if (!webhookSecret.startsWith('whsec_')) {
+      toast.error('El signing secret de Stripe debe empezar con "whsec_"')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('businesses')
+        .update({ stripe_webhook_secret: webhookSecret })
+        .eq('id', user.id)
+
+      if (error) throw error
+      
+      // Actualizar la URL del webhook
+      const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin
+      setWebhookUrl(`${baseUrl}/.netlify/functions/stripe-webhook?secret=${webhookSecret}`)
+      
+      toast.success('Webhook secret guardado correctamente')
+    } catch (error) {
+      console.error('Error saving webhook secret:', error)
+      toast.error('Error al guardar el webhook secret')
     } finally {
       setLoading(false)
     }
@@ -118,14 +153,15 @@ export default function WebhookConfig() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Webhook Secret
+            Stripe Signing Secret
           </label>
           <div className="flex">
             <input
               type="text"
               value={webhookSecret}
-              readOnly
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-sm"
+              onChange={(e) => setWebhookSecret(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md text-sm"
+              placeholder="Pega aquí el signing secret de Stripe (whsec_...)"
             />
             <button
               onClick={() => copyToClipboard(webhookSecret, 'secret')}
@@ -136,24 +172,37 @@ export default function WebhookConfig() {
               {copied.secret ? 'Copiado' : 'Copiar'}
             </button>
           </div>
-          {!webhookSecret && (
+          <div className="mt-2 flex gap-2">
             <button
-              onClick={generateWebhookSecret}
-              disabled={loading}
-              className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              onClick={saveWebhookSecret}
+              disabled={!webhookSecret || loading}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
             >
               {loading ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  Generando...
+                  Guardando...
                 </>
               ) : (
                 <>
-                  <RefreshCw className="w-4 h-4" />
-                  Generar Secret
+                  <CheckCircle className="w-4 h-4" />
+                  Guardar Secret
                 </>
               )}
             </button>
+            <button
+              onClick={generateWebhookSecret}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Generar Nuevo
+            </button>
+          </div>
+          {webhookSecret && !webhookSecret.startsWith('whsec_') && (
+            <p className="mt-1 text-sm text-yellow-600">
+              ⚠️ El signing secret de Stripe debe empezar con "whsec_"
+            </p>
           )}
         </div>
       </div>
@@ -161,7 +210,7 @@ export default function WebhookConfig() {
       <div className="mt-6 p-4 bg-blue-50 rounded-lg">
         <h4 className="font-semibold text-blue-900 mb-2">📋 Instrucciones paso a paso:</h4>
         <ol className="list-decimal list-inside text-sm text-blue-800 space-y-1">
-          <li><strong>Primero:</strong> Haz clic en "Generar Secret" arriba para crear tu webhook secret único</li>
+          <li><strong>Primero:</strong> Haz clic en "Generar Nuevo" arriba para crear tu webhook secret único</li>
           <li>Copia la <strong>URL del Webhook</strong> que se genera automáticamente</li>
           <li>Ve a tu <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">dashboard de Stripe</a></li>
           <li>Navega a <strong>"Desarrolladores"</strong> → <strong>"Webhooks"</strong></li>
@@ -171,7 +220,8 @@ export default function WebhookConfig() {
           <li>Haz clic en <strong>"Agregar endpoint"</strong></li>
           <li>Una vez creado, haz clic en el webhook que acabas de crear</li>
           <li>En la sección "Signing secret", haz clic en <strong>"Revelar"</strong></li>
-          <li>Copia el secret de Stripe (empieza con <code>whsec_</code>) y pégalo en el campo "Webhook Secret" de arriba</li>
+          <li>Copia el secret de Stripe (empieza con <code>whsec_</code>) y pégalo en el campo "Stripe Signing Secret" de arriba</li>
+          <li>Haz clic en <strong>"Guardar Secret"</strong> para completar la configuración</li>
         </ol>
       </div>
 
