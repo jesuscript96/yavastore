@@ -8,13 +8,6 @@
   # Variables de entorno para el build
   environment = { NODE_VERSION = "18" }
 
-[build.environment]
-  # Versión de Node.js
-  NODE_VERSION = "18"
-  
-  # Variables de entorno que se usarán durante el build
-  VITE_APP_URL = "https://tu-dominio.netlify.app"
-
 # Redirects para SPA (Single Page Application)
 [[redirects]]
   from = "/*"
@@ -45,7 +38,7 @@
 
 # Configuración de funciones serverless (para el webhook)
 [functions]
-  directory = "api"
+  directory = "netlify/functions"
   node_bundler = "esbuild"
 
 # Configuración de plugins (opcional)
