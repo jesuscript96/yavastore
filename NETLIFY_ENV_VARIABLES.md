@@ -38,6 +38,12 @@ STRIPE_PUBLISHABLE_KEY
 **Valor**: `pk_live_...` (para producción)
 **Descripción**: Clave pública de Stripe para producción
 
+```
+STRIPE_WEBHOOK_SECRET
+```
+**Valor**: `whsec_...` (signing secret de tu webhook principal)
+**Descripción**: Signing secret por defecto para verificar webhooks cuando no se encuentra el negocio específico
+
 ### 🌐 **APPLICATION CONFIGURATION**
 
 ```
