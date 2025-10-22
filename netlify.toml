@@ -1,0 +1,59 @@
+[build]
+  # Directorio de build
+  publish = "dist"
+  
+  # Comando de build
+  command = "npm run build"
+  
+  # Variables de entorno para el build
+  environment = { NODE_VERSION = "18" }
+
+[build.environment]
+  # Versión de Node.js
+  NODE_VERSION = "18"
+  
+  # Variables de entorno que se usarán durante el build
+  VITE_APP_URL = "https://tu-dominio.netlify.app"
+
+# Redirects para SPA (Single Page Application)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers de seguridad
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# Headers específicos para archivos estáticos
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Headers para el archivo index.html
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Configuración de funciones serverless (para el webhook)
+[functions]
+  directory = "api"
+  node_bundler = "esbuild"
+
+# Configuración de plugins (opcional)
+[[plugins]]
+  package = "@netlify/plugin-lighthouse"
+  
+  [plugins.inputs.thresholds]
+    performance = 0.8
+    accessibility = 0.9
+    best-practices = 0.8
+    seo = 0.8

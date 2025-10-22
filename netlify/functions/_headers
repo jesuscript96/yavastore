@@ -1,0 +1,5 @@
+# Headers para Netlify Functions
+/*
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Headers: Content-Type, stripe-signature
+  Access-Control-Allow-Methods: POST, OPTIONS

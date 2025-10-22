@@ -28,7 +28,9 @@ export default function WebhookConfig() {
       
       // Solo mostrar URL si hay un secret generado
       if (data.stripe_webhook_secret) {
-        setWebhookUrl(`${window.location.origin}/api/webhooks/stripe?secret=${data.stripe_webhook_secret}`)
+        // Usar la URL de producción para Netlify Functions
+        const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin
+        setWebhookUrl(`${baseUrl}/.netlify/functions/stripe-webhook?secret=${data.stripe_webhook_secret}`)
       } else {
         setWebhookUrl('')
       }
@@ -51,7 +53,9 @@ export default function WebhookConfig() {
       if (error) throw error
       
       setWebhookSecret(newSecret)
-      setWebhookUrl(`${window.location.origin}/api/webhooks/stripe?secret=${newSecret}`)
+      // Usar la URL de producción para Netlify Functions
+      const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin
+      setWebhookUrl(`${baseUrl}/.netlify/functions/stripe-webhook?secret=${newSecret}`)
     } catch (error) {
       console.error('Error generating webhook secret:', error)
       alert('Error al generar el webhook secret')
