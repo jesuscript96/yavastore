@@ -9,7 +9,8 @@ import {
   Settings, 
   Menu, 
   X,
-  LogOut
+  LogOut,
+  ShoppingCart
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { logoutService } from '../lib/logoutService'
@@ -18,6 +19,7 @@ import toast from 'react-hot-toast'
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Pedidos', href: '/orders', icon: Package },
+  { name: 'Pedidos Stripe', href: '/stripe-orders', icon: ShoppingCart },
   { name: 'Repartidores', href: '/delivery-people', icon: Users },
   { name: 'Asignaciones', href: '/assignments', icon: Calendar },
   { name: 'Estadísticas', href: '/statistics', icon: BarChart3 },

@@ -219,15 +219,30 @@ export async function handler(event, context) {
       case 'checkout.session.completed': {
         const session = eventData.data.object
 
+        // Log completo del webhook para debugging
+        console.log('=== STRIPE WEBHOOK RECEIVED ===')
+        console.log('Event Type:', eventData.type)
+        console.log('Business:', business.name, '(ID:', business.id + ')')
+        console.log('Session ID:', session.id)
+        console.log('Full Session Object:', JSON.stringify(session, null, 2))
+        console.log('Customer Details:', JSON.stringify(session.customer_details, null, 2))
+        console.log('Metadata:', JSON.stringify(session.metadata, null, 2))
+        console.log('Line Items:', JSON.stringify(session.display_items || session.line_items, null, 2))
+        console.log('Amount Total:', session.amount_total)
+        console.log('Currency:', session.currency)
+        console.log('Payment Status:', session.payment_status)
+        console.log('================================')
+
         // Create the order for the specific business
         await createOrder(session, business.id)
 
-        console.log(`Order created for business: ${business.name} (ID: ${business.id})`)
+        console.log(`✅ Order created successfully for business: ${business.name} (ID: ${business.id})`)
         break
       }
 
       default:
         console.log(`Unhandled event type: ${eventData.type}`)
+        console.log('Event data:', JSON.stringify(eventData, null, 2))
     }
 
     // Return a response to acknowledge receipt of the event

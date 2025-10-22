@@ -16,6 +16,7 @@ import Assignments from './pages/Assignments'
 import Statistics from './pages/Statistics'
 import Settings from './pages/Settings'
 import StripeSetupInstructions from './pages/StripeSetupInstructions'
+import StripeOrders from './pages/StripeOrders'
 
 function App() {
   const { user, loading, initialized, initialize } = useAuthStore()
@@ -54,6 +55,7 @@ function App() {
         <Route path="/statistics" element={<Statistics />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/stripe-instructions" element={<StripeSetupInstructions />} />
+        <Route path="/stripe-orders" element={<StripeOrders />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
