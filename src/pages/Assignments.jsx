@@ -48,8 +48,29 @@ export default function Assignments() {
 
   const getOrdersForDate = (date) => {
     return orders.filter(order => {
-      const orderDate = new Date(order.delivery_time)
-      return isSameDay(orderDate, date)
+      if (!order.assigned_date) return false
+      
+      // Fix timezone issue by adding T00:00:00 to avoid UTC interpretation
+      const orderDate = new Date(order.assigned_date + 'T00:00:00')
+      
+      const isSameDate = isSameDay(orderDate, date)
+      
+      // Debug log for assigned orders
+      if (isSameDate) {
+        console.log('📅 Order found for date:', {
+          orderId: order.id,
+          customer: order.customer_name,
+          assignedDate: order.assigned_date,
+          orderDateParsed: orderDate.toISOString(),
+          targetDate: date.toISOString(),
+          deliveryPerson: order.delivery_people?.name,
+          timeRange: order.assigned_delivery_start_time && order.assigned_delivery_end_time 
+            ? `${order.assigned_delivery_start_time} - ${order.assigned_delivery_end_time}`
+            : 'No time range'
+        })
+      }
+      
+      return isSameDate
     })
   }
 
@@ -198,11 +219,19 @@ export default function Assignments() {
                                   <span className="font-medium truncate">{order.customer_name}</span>
                                 </div>
                                 <p className="text-gray-600 truncate">
-                                  {format(new Date(order.delivery_time), 'HH:mm')}
+                                  {order.assigned_delivery_start_time && order.assigned_delivery_end_time 
+                                    ? `${order.assigned_delivery_start_time} - ${order.assigned_delivery_end_time}`
+                                    : format(new Date(order.delivery_time), 'HH:mm')
+                                  }
                                 </p>
                                 <p className="text-gray-600 truncate">
                                   ${order.total_amount?.toLocaleString()}
                                 </p>
+                                {order.delivery_people && (
+                                  <p className="text-blue-600 truncate font-medium">
+                                    📦 {order.delivery_people.name}
+                                  </p>
+                                )}
                               </div>
                             )
                           })}

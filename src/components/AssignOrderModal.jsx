@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, User, Calendar, Clock, Package } from 'lucide-react'
 import { useDeliveryPeopleStore } from '../store/deliveryPeopleStore'
 import { useOrdersStore } from '../store/ordersStore'
@@ -29,11 +29,14 @@ export default function AssignOrderModal({
   const [loading, setLoading] = useState(false)
 
   // Reset form when modal opens/closes
-  useState(() => {
+  useEffect(() => {
     if (isOpen && order) {
       setSelectedDeliveryPerson('')
-      setAssignedDate('')
       setSelectedTimeRange('')
+      
+      // Set default date to today (not tomorrow)
+      const today = new Date().toISOString().split('T')[0]
+      setAssignedDate(today)
     }
   }, [isOpen, order])
 
