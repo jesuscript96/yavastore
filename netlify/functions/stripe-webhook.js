@@ -142,6 +142,62 @@ async function parseProducts(sessionId) {
 }
 
 /**
+ * Get or create default business for Stripe orders
+ */
+async function getDefaultBusiness() {
+  try {
+    // Primero intentar obtener cualquier negocio existente
+    const { data: existingBusiness, error: fetchError } = await supabaseAdmin
+      .from('businesses')
+      .select('id, name')
+      .limit(1)
+      .single()
+
+    if (existingBusiness && !fetchError) {
+      console.log('Using existing business:', existingBusiness.name, '(ID:', existingBusiness.id + ')')
+      return existingBusiness.id
+    }
+
+    // Si no hay negocios existentes, crear uno por defecto
+    console.log('No existing businesses found, creating default business...')
+    
+    // Crear un usuario por defecto primero (necesario para la relación)
+    const { data: defaultUser, error: userError } = await supabaseAdmin.auth.admin.createUser({
+      email: 'stripe-default@yava.com',
+      password: 'stripe-default-password-123',
+      email_confirm: true
+    })
+
+    if (userError) {
+      console.error('Error creating default user:', userError)
+      throw new Error('Could not create default business user')
+    }
+
+    // Crear el negocio por defecto
+    const { data: defaultBusiness, error: businessError } = await supabaseAdmin
+      .from('businesses')
+      .insert([{
+        id: defaultUser.user.id,
+        name: 'Negocio por Defecto (Stripe)',
+        email: 'stripe-default@yava.com'
+      }])
+      .select()
+      .single()
+
+    if (businessError) {
+      console.error('Error creating default business:', businessError)
+      throw new Error('Could not create default business')
+    }
+
+    console.log('Created default business:', defaultBusiness.name, '(ID:', defaultBusiness.id + ')')
+    return defaultBusiness.id
+  } catch (error) {
+    console.error('Error getting default business:', error)
+    throw error
+  }
+}
+
+/**
  * Create order in Supabase
  */
 async function createOrder(session, businessId = null) {
@@ -154,8 +210,15 @@ async function createOrder(session, businessId = null) {
     let finalBusinessId = businessId
     if (!finalBusinessId) {
       // Intentar obtener el business_id del metadata de Stripe
-      finalBusinessId = session.metadata?.business_id || '1' // Usar ID 1 como fallback
-      console.log('Using business_id from metadata or fallback:', finalBusinessId)
+      const metadataBusinessId = session.metadata?.business_id
+      if (metadataBusinessId) {
+        finalBusinessId = metadataBusinessId
+        console.log('Using business_id from metadata:', finalBusinessId)
+      } else {
+        // Obtener o crear un negocio por defecto
+        finalBusinessId = await getDefaultBusiness()
+        console.log('Using default business_id:', finalBusinessId)
+      }
     }
 
     // Si no hay productos o el precio es 0, usar el total de la sesión
