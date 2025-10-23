@@ -13,6 +13,7 @@ import { useAuthStore } from '../store/authStore'
 import { useOrdersStore } from '../store/ordersStore'
 import { useDeliveryPeopleStore } from '../store/deliveryPeopleStore'
 import LoadingSpinner from '../components/LoadingSpinner'
+import AssignOrderModal from '../components/AssignOrderModal'
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import toast from 'react-hot-toast'
@@ -33,8 +34,6 @@ export default function Assignments() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
-  const [selectedDeliveryPerson, setSelectedDeliveryPerson] = useState('')
-  const [assignedDate, setAssignedDate] = useState('')
 
   useEffect(() => {
     if (business?.id) {
@@ -60,39 +59,18 @@ export default function Assignments() {
 
   const handleAssignOrder = (order) => {
     setSelectedOrder(order)
-    setAssignedDate(format(new Date(order.delivery_time), 'yyyy-MM-dd'))
     setShowAssignModal(true)
   }
 
-  const handleAssign = async () => {
-    if (!selectedDeliveryPerson || !assignedDate) {
-      toast.error('Selecciona un repartidor y fecha')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const { error } = await assignOrder(selectedOrder.id, selectedDeliveryPerson, assignedDate)
-      if (error) {
-        toast.error('Error al asignar el pedido')
-      } else {
-        toast.success('Pedido asignado correctamente')
-        setShowAssignModal(false)
-        setSelectedOrder(null)
-        setSelectedDeliveryPerson('')
-        setAssignedDate('')
-      }
-    } catch (error) {
-      toast.error('Error al asignar el pedido')
-    } finally {
-      setLoading(false)
-    }
+  const handleCloseModal = () => {
+    setShowAssignModal(false)
+    setSelectedOrder(null)
   }
 
   const getAvailablePeopleForOrder = (order) => {
-    const orderDate = new Date(order.delivery_time)
-    const orderTime = format(orderDate, 'HH:mm')
-    return getAvailableDeliveryPeople(format(orderDate, 'yyyy-MM-dd'), orderTime)
+    // For assignment, we want to show all active delivery people
+    // The time filtering will be handled in the assignment modal
+    return deliveryPeople.filter(person => person.active)
   }
 
   return (
@@ -147,7 +125,7 @@ export default function Assignments() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <span className="text-xs text-gray-500">
-                        {availablePeople.length} repartidores disponibles
+                        {availablePeople.length} repartidores activos
                       </span>
                       <button
                         onClick={() => handleAssignOrder(order)}
@@ -267,76 +245,12 @@ export default function Assignments() {
         </div>
       </div>
 
-      {/* Assign Modal */}
-      {showAssignModal && selectedOrder && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Asignar Pedido</h3>
-              
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-900">{selectedOrder.customer_name}</p>
-                <p className="text-xs text-gray-500">
-                  {format(new Date(selectedOrder.delivery_time), 'dd/MM/yyyy HH:mm', { locale: es })}
-                </p>
-                <p className="text-xs text-gray-500">${selectedOrder.total_amount?.toLocaleString()}</p>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Repartidor
-                  </label>
-                  <select
-                    value={selectedDeliveryPerson}
-                    onChange={(e) => setSelectedDeliveryPerson(e.target.value)}
-                    className="input"
-                  >
-                    <option value="">Selecciona un repartidor</option>
-                    {getAvailablePeopleForOrder(selectedOrder).map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {person.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Fecha de Asignación
-                  </label>
-                  <input
-                    type="date"
-                    value={assignedDate}
-                    onChange={(e) => setAssignedDate(e.target.value)}
-                    className="input"
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowAssignModal(false)}
-                  className="btn-secondary"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleAssign}
-                  disabled={loading}
-                  className="btn-primary"
-                >
-                  {loading ? (
-                    <LoadingSpinner size="sm" className="mr-2" />
-                  ) : null}
-                  Asignar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Assign Order Modal */}
+      <AssignOrderModal
+        isOpen={showAssignModal}
+        onClose={handleCloseModal}
+        order={selectedOrder}
+      />
     </div>
   )
 }

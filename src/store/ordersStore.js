@@ -120,15 +120,35 @@ export const useOrdersStore = create((set, get) => ({
   },
 
   // Assign order to delivery person
-  assignOrder: async (orderId, deliveryPersonId, assignedDate) => {
+  assignOrder: async (orderId, deliveryPersonId, assignedDate, startTime = null, endTime = null) => {
+    console.log('🚀 Starting order assignment process...')
+    console.log('📋 Assignment data:', {
+      orderId,
+      deliveryPersonId,
+      assignedDate,
+      startTime,
+      endTime
+    })
+
     try {
+      const updateData = {
+        delivery_person_id: deliveryPersonId,
+        assigned_date: assignedDate,
+        status: ORDER_STATUS.ASSIGNED
+      }
+
+      // Add time range if provided
+      if (startTime && endTime) {
+        updateData.assigned_delivery_start_time = startTime
+        updateData.assigned_delivery_end_time = endTime
+        console.log('⏰ Adding time range:', { startTime, endTime })
+      } else {
+        console.log('⏰ No time range provided - using default "anytime"')
+      }
+
       const { data, error } = await supabase
         .from('orders')
-        .update({
-          delivery_person_id: deliveryPersonId,
-          assigned_date: assignedDate,
-          status: ORDER_STATUS.ASSIGNED
-        })
+        .update(updateData)
         .eq('id', orderId)
         .select(`
           *,
@@ -141,7 +161,19 @@ export const useOrdersStore = create((set, get) => ({
         `)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Order assignment failed:', error)
+        throw error
+      }
+
+      console.log('✅ Order assigned successfully:', {
+        orderId: data.id,
+        deliveryPerson: data.delivery_people?.name,
+        assignedDate: data.assigned_date,
+        timeRange: data.assigned_delivery_start_time && data.assigned_delivery_end_time 
+          ? `${data.assigned_delivery_start_time} - ${data.assigned_delivery_end_time}`
+          : 'Cualquiera'
+      })
       
       set(state => ({
         orders: state.orders.map(order => 
@@ -151,6 +183,7 @@ export const useOrdersStore = create((set, get) => ({
       
       return { data, error: null }
     } catch (error) {
+      console.error('💥 Order assignment failed:', error)
       return { data: null, error }
     }
   },

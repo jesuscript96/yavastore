@@ -32,7 +32,7 @@ export const useDeliveryPeopleStore = create((set, get) => ({
       email: deliveryPersonData.email,
       phone: deliveryPersonData.phone,
       business_id: deliveryPersonData.business_id,
-      has_temp_password: !!deliveryPersonData.temp_password
+      has_password: !!deliveryPersonData.password
     })
 
     try {
@@ -49,7 +49,7 @@ export const useDeliveryPeopleStore = create((set, get) => ({
       console.log('👤 Creating auth user for delivery person...')
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: deliveryPersonData.email,
-        password: deliveryPersonData.temp_password,
+        password: deliveryPersonData.password,
         email_confirm: true
       })
 
@@ -68,8 +68,14 @@ export const useDeliveryPeopleStore = create((set, get) => ({
       const { data, error } = await supabase
         .from('delivery_people')
         .insert([{
-          ...deliveryPersonData,
-          id: authData.user.id
+          id: authData.user.id,
+          business_id: deliveryPersonData.business_id,
+          name: deliveryPersonData.name,
+          email: deliveryPersonData.email,
+          phone: deliveryPersonData.phone,
+          password: deliveryPersonData.password,
+          schedule_config: deliveryPersonData.schedule_config,
+          active: deliveryPersonData.active
         }])
         .select()
         .single()

@@ -35,7 +35,7 @@ export default function CreateDeliveryPerson() {
       name: '',
       email: '',
       phone: '',
-      temp_password: '',
+      password: '',
       schedule_config: {
         0: { enabled: false, start_time: '09:00', end_time: '18:00' },
         1: { enabled: true, start_time: '09:00', end_time: '18:00' },
@@ -58,7 +58,7 @@ export default function CreateDeliveryPerson() {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        temp_password: data.temp_password,
+        password: data.password,
         schedule_config: data.schedule_config,
         active: true
       }
@@ -90,7 +90,7 @@ export default function CreateDeliveryPerson() {
     for (let i = 0; i < 8; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length))
     }
-    setValue('temp_password', password)
+    setValue('password', password)
   }
 
   return (
@@ -191,12 +191,12 @@ export default function CreateDeliveryPerson() {
           </div>
           <div className="card-body space-y-4">
             <div>
-              <label htmlFor="temp_password" className="block text-sm font-medium text-gray-700">
-                Contraseña Temporal *
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Contraseña *
               </label>
               <div className="mt-1 relative">
                 <input
-                  {...register('temp_password', { 
+                  {...register('password', { 
                     required: 'La contraseña es requerida',
                     minLength: {
                       value: 6,
@@ -204,7 +204,7 @@ export default function CreateDeliveryPerson() {
                     }
                   })}
                   type={showPassword ? 'text' : 'password'}
-                  className={`input pr-20 ${errors.temp_password ? 'input-error' : ''}`}
+                  className={`input pr-20 ${errors.password ? 'input-error' : ''}`}
                   placeholder="••••••••"
                 />
                 <div className="absolute inset-y-0 right-0 flex items-center">
@@ -228,11 +228,11 @@ export default function CreateDeliveryPerson() {
                   </button>
                 </div>
               </div>
-              {errors.temp_password && (
-                <p className="mt-1 text-sm text-danger-600">{errors.temp_password.message}</p>
+              {errors.password && (
+                <p className="mt-1 text-sm text-danger-600">{errors.password.message}</p>
               )}
               <p className="mt-1 text-xs text-gray-500">
-                El repartidor podrá cambiar esta contraseña después del primer inicio de sesión
+                Esta será la contraseña permanente del repartidor para acceder a la aplicación
               </p>
             </div>
           </div>
