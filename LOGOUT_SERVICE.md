@@ -162,3 +162,4 @@ El servicio incluye logging detallado con emojis para facilitar el debugging:
 - ✅ Operación exitosa
 - ⚠️ Advertencia
 - ❌ Error
+

@@ -4,7 +4,14 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
 
+// 🔍 DEBUG: Log environment variables
+console.log('🔧 Supabase Configuration:')
+console.log('  URL:', supabaseUrl ? '✅ Set' : '❌ Missing')
+console.log('  Anon Key:', supabaseAnonKey ? '✅ Set' : '❌ Missing')
+console.log('  Service Role Key:', supabaseServiceRoleKey ? '✅ Set' : '❌ Missing')
+
 if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ Missing Supabase environment variables')
   throw new Error('Missing Supabase environment variables')
 }
 
@@ -17,6 +24,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
+// 🔍 DEBUG: Log Supabase client creation
+console.log('✅ Supabase client created successfully')
+
 // Cliente admin para operaciones que requieren permisos de administrador
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey || supabaseAnonKey, {
   auth: {
@@ -24,6 +34,9 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey ||
     persistSession: false
   }
 })
+
+// 🔍 DEBUG: Log Admin client creation
+console.log('✅ Supabase Admin client created successfully')
 
 // Database types
 export const ORDER_STATUS = {

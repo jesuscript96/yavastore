@@ -21,17 +21,30 @@ import StripeOrders from './pages/StripeOrders'
 function App() {
   const { user, loading, initialized, initialize } = useAuthStore()
 
+  // 🔍 DEBUG: Log app state
+  console.log('🎯 App: Current state:', {
+    hasUser: !!user,
+    userId: user?.id,
+    userEmail: user?.email,
+    loading,
+    initialized
+  })
+
   useEffect(() => {
+    console.log('🔄 App: useEffect triggered', { initialized })
     if (!initialized) {
+      console.log('🚀 App: Starting initialization...')
       initialize()
     }
   }, [initialized, initialize])
 
   if (loading || !initialized) {
+    console.log('⏳ App: Showing loading spinner')
     return <LoadingSpinner />
   }
 
   if (!user) {
+    console.log('🚪 App: No user, showing login routes')
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -41,6 +54,7 @@ function App() {
     )
   }
 
+  console.log('🏠 App: User authenticated, showing main app')
   return (
     <Layout>
       <Routes>

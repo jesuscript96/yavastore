@@ -10,17 +10,53 @@ export const useAuthStore = create((set, get) => ({
 
   // Initialize auth state
   initialize: async () => {
+    console.log('🚀 AuthStore: Starting initialization...')
+    
+    // Check localStorage for Supabase data
+    const supabaseAuthKey = `sb-${import.meta.env.VITE_SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`
+    const authData = localStorage.getItem(supabaseAuthKey)
+    console.log('🔍 AuthStore: localStorage check:', {
+      hasAuthData: !!authData,
+      authDataLength: authData?.length || 0,
+      authKey: supabaseAuthKey
+    })
+    
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      console.log('🔍 AuthStore: Getting session from Supabase...')
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      console.log('🔍 AuthStore: Session details:', {
+        hasSession: !!session,
+        sessionValid: session?.expires_at ? new Date(session.expires_at * 1000) > new Date() : false,
+        expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+        accessToken: session?.access_token ? 'Present' : 'Missing'
+      })
+      
+      console.log('📋 AuthStore: Session data:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        userId: session?.user?.id,
+        userEmail: session?.user?.email,
+        error: error?.message
+      })
       
       if (session?.user) {
-        await get().fetchBusiness(session.user.id)
+        console.log('✅ AuthStore: User found, fetching business data...')
+        try {
+          await get().fetchBusiness(session.user.id)
+          console.log('✅ AuthStore: Business fetch completed successfully')
+        } catch (businessError) {
+          console.error('❌ AuthStore: Business fetch failed during initialization:', businessError)
+        }
         set({ user: session.user, loading: false, initialized: true })
+        console.log('✅ AuthStore: Initialization complete with user')
       } else {
+        console.log('ℹ️ AuthStore: No user found, setting empty state')
         set({ user: null, business: null, loading: false, initialized: true })
+        console.log('✅ AuthStore: Initialization complete without user')
       }
     } catch (error) {
-      console.error('Error initializing auth:', error)
+      console.error('❌ AuthStore: Error initializing auth:', error)
       set({ user: null, business: null, loading: false, initialized: true })
     }
   },
@@ -140,18 +176,70 @@ export const useAuthStore = create((set, get) => ({
 
   // Fetch business data
   fetchBusiness: async (userId) => {
+    console.log('🏢 AuthStore: Fetching business for user:', userId)
     try {
+      // Check current auth state before querying with timeout
+      console.log('🔍 AuthStore: About to check current user...')
+      
+      const userPromise = supabase.auth.getUser()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('getUser timeout after 5 seconds')), 5000)
+      )
+      
+      const { data: { user: currentUser } } = await Promise.race([userPromise, timeoutPromise])
+      
+      console.log('🔍 AuthStore: Current authenticated user:', {
+        hasUser: !!currentUser,
+        userId: currentUser?.id,
+        userEmail: currentUser?.email
+      })
+      
+      console.log('🔍 AuthStore: About to query businesses table...')
       const { data, error } = await supabase
         .from('businesses')
         .select('*')
         .eq('id', userId)
         .single()
 
-      if (error) throw error
+      console.log('🔍 AuthStore: Raw Supabase response:', { 
+        data, 
+        error,
+        errorCode: error?.code,
+        errorMessage: error?.message,
+        errorDetails: error?.details,
+        errorHint: error?.hint
+      })
+
+      console.log('📋 AuthStore: Business fetch result:', {
+        hasData: !!data,
+        businessName: data?.name,
+        businessEmail: data?.email,
+        error: error?.message
+      })
+
+      if (error) {
+        console.error('❌ AuthStore: Business fetch failed with error:', error)
+        throw error
+      }
+      
       set({ business: data })
+      console.log('✅ AuthStore: Business data set successfully')
       return { data, error: null }
     } catch (error) {
-      console.error('Error fetching business:', error)
+      console.error('❌ AuthStore: Error fetching business:', error)
+      console.error('❌ AuthStore: Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        isTimeout: error.message.includes('timeout')
+      })
+      
+      // If it's a timeout error, log additional info
+      if (error.message.includes('timeout')) {
+        console.error('⏰ AuthStore: getUser() timed out - this indicates a network or auth issue')
+      }
+      
       return { data: null, error }
     }
   },
@@ -178,12 +266,27 @@ export const useAuthStore = create((set, get) => ({
 
 // Listen to auth changes
 supabase.auth.onAuthStateChange(async (event, session) => {
+  console.log('🔄 AuthStore: Auth state change detected:', {
+    event,
+    hasSession: !!session,
+    hasUser: !!session?.user,
+    userId: session?.user?.id
+  })
+  
   const { initialize, fetchBusiness } = useAuthStore.getState()
   
   if (event === 'SIGNED_IN' && session?.user) {
-    await fetchBusiness(session.user.id)
+    console.log('✅ AuthStore: User signed in, fetching business...')
+    try {
+      await fetchBusiness(session.user.id)
+      console.log('✅ AuthStore: Business fetch completed in auth listener')
+    } catch (businessError) {
+      console.error('❌ AuthStore: Business fetch failed in auth listener:', businessError)
+    }
     useAuthStore.setState({ user: session.user })
+    console.log('✅ AuthStore: User state updated')
   } else if (event === 'SIGNED_OUT') {
+    console.log('🚪 AuthStore: User signed out, clearing state')
     useAuthStore.setState({ user: null, business: null })
   }
 })
