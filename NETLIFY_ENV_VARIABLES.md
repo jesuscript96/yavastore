@@ -24,6 +24,12 @@ SUPABASE_SERVICE_ROLE_KEY
 **Valor**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
 **Descripción**: Clave de servicio de Supabase (service role key)
 
+```
+VITE_SUPABASE_SERVICE_ROLE_KEY
+```
+**Valor**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` (mismo valor que SUPABASE_SERVICE_ROLE_KEY)
+**Descripción**: Clave de servicio de Supabase para el frontend (necesaria para crear usuarios repartidores)
+
 ### 💳 **STRIPE CONFIGURATION**
 
 ```

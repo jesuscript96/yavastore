@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseAdmin } from '../lib/supabase'
 
 export const useDeliveryPeopleStore = create((set, get) => ({
   deliveryPeople: [],
@@ -26,17 +26,45 @@ export const useDeliveryPeopleStore = create((set, get) => ({
 
   // Create delivery person
   createDeliveryPerson: async (deliveryPersonData) => {
+    console.log('🚀 Starting delivery person creation process...')
+    console.log('📋 Delivery person data:', {
+      name: deliveryPersonData.name,
+      email: deliveryPersonData.email,
+      phone: deliveryPersonData.phone,
+      business_id: deliveryPersonData.business_id,
+      has_temp_password: !!deliveryPersonData.temp_password
+    })
+
     try {
-      // First create auth user for delivery person
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // Check if we have service role key
+      const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
+      console.log('🔑 Service role key available:', !!serviceRoleKey)
+      
+      if (!serviceRoleKey) {
+        console.error('❌ No service role key found! Using anon key will cause 403 error.')
+        throw new Error('Service role key not configured. Cannot create users.')
+      }
+
+      // First create auth user for delivery person using admin client
+      console.log('👤 Creating auth user for delivery person...')
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: deliveryPersonData.email,
         password: deliveryPersonData.temp_password,
         email_confirm: true
       })
 
-      if (authError) throw authError
+      if (authError) {
+        console.error('❌ Auth user creation failed:', authError)
+        throw authError
+      }
+
+      console.log('✅ Auth user created successfully:', {
+        user_id: authData.user.id,
+        email: authData.user.email
+      })
 
       // Then create delivery person record
+      console.log('📝 Creating delivery person record...')
       const { data, error } = await supabase
         .from('delivery_people')
         .insert([{
@@ -46,7 +74,16 @@ export const useDeliveryPeopleStore = create((set, get) => ({
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Delivery person record creation failed:', error)
+        throw error
+      }
+
+      console.log('✅ Delivery person record created successfully:', {
+        id: data.id,
+        name: data.name,
+        email: data.email
+      })
       
       set(state => ({
         deliveryPeople: [data, ...state.deliveryPeople]
@@ -54,6 +91,13 @@ export const useDeliveryPeopleStore = create((set, get) => ({
       
       return { data, error: null }
     } catch (error) {
+      console.error('💥 Delivery person creation failed:', error)
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      })
       return { data: null, error }
     }
   },
