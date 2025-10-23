@@ -93,11 +93,15 @@ async function verifyWebhookSignature(rawBody, signature, webhookSecret) {
  */
 function parseOrderData(session) {
   const metadata = session.metadata || {}
+  const customerDetails = session.customer_details || {}
+  const shipping = session.shipping || {}
 
   return {
-    customer_name: metadata.customer_name || session.customer_details?.name || 'Cliente sin nombre',
-    customer_phone: metadata.customer_phone || session.customer_details?.phone || '',
-    customer_address: metadata.customer_address || session.customer_details?.address || 'Sin dirección',
+    customer_name: customerDetails.name || customerDetails.individual_name || 'Cliente sin nombre',
+    customer_phone: customerDetails.phone || '',
+    customer_address: shipping.address ? 
+      `${shipping.address.line1}, ${shipping.address.city}, ${shipping.address.postal_code}` :
+      'Sin dirección',
     delivery_time: metadata.delivery_time || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     notes: metadata.notes || null
   }
@@ -112,6 +116,15 @@ async function parseProducts(sessionId) {
       limit: 100
     })
 
+    if (lineItems.data.length === 0) {
+      // Si no hay line items, crear un producto genérico
+      return [{
+        name: 'Producto de Stripe',
+        quantity: 1,
+        price: 0 // Se calculará desde amount_total
+      }]
+    }
+
     return lineItems.data.map(item => ({
       name: item.description || item.price.product?.name || 'Producto',
       quantity: item.quantity || 1,
@@ -119,7 +132,12 @@ async function parseProducts(sessionId) {
     }))
   } catch (error) {
     console.error('Error fetching line items:', error)
-    return []
+    // Fallback: crear un producto genérico
+    return [{
+      name: 'Producto de Stripe',
+      quantity: 1,
+      price: 0
+    }]
   }
 }
 
@@ -140,14 +158,21 @@ async function createOrder(session, businessId = null) {
       console.log('Using business_id from metadata or fallback:', finalBusinessId)
     }
 
+    // Si no hay productos o el precio es 0, usar el total de la sesión
+    if (products.length === 0 || products[0].price === 0) {
+      products[0] = {
+        name: 'Producto de Stripe',
+        quantity: 1,
+        price: totalAmount
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('orders')
       .insert([{
         business_id: finalBusinessId,
         customer_name: orderData.customer_name,
-        customer_address: typeof orderData.customer_address === 'string'
-          ? orderData.customer_address
-          : JSON.stringify(orderData.customer_address),
+        customer_address: orderData.customer_address,
         customer_phone: orderData.customer_phone,
         products: products,
         total_amount: totalAmount,
@@ -161,6 +186,7 @@ async function createOrder(session, businessId = null) {
       .single()
 
     if (error) {
+      console.error('Supabase error:', error)
       throw error
     }
 
