@@ -94,14 +94,49 @@ async function verifyWebhookSignature(rawBody, signature, webhookSecret) {
 function parseOrderData(session) {
   const metadata = session.metadata || {}
   const customerDetails = session.customer_details || {}
-  const shipping = session.shipping || {}
+  const collectedInfo = session.collected_information || {}
+  
+  // Priorizar collected_information.shipping_details (API 2025-09-30+)
+  // Fallback a session.shipping para compatibilidad con versiones anteriores
+  const shippingDetails = collectedInfo.shipping_details || session.shipping || {}
+  const shippingAddress = shippingDetails.address || {}
+
+  // Extraer nombre del cliente
+  const customerName = collectedInfo.individual_name || 
+                      customerDetails.name || 
+                      customerDetails.individual_name || 
+                      'Cliente sin nombre'
+
+  // Extraer teléfono del cliente
+  const customerPhone = customerDetails.phone || ''
+
+  // Formatear dirección completa
+  let customerAddress = 'Sin dirección'
+  if (shippingAddress.line1) {
+    const addressParts = [
+      shippingAddress.line1,
+      shippingAddress.line2,
+      shippingAddress.city,
+      shippingAddress.state,
+      shippingAddress.postal_code
+    ].filter(Boolean) // Remover valores vacíos
+    
+    customerAddress = addressParts.join(', ')
+  }
+
+  // Log detallado para debugging
+  console.log('=== PARSING ORDER DATA ===')
+  console.log('Customer Name:', customerName)
+  console.log('Customer Phone:', customerPhone)
+  console.log('Customer Address:', customerAddress)
+  console.log('Shipping Details:', JSON.stringify(shippingDetails, null, 2))
+  console.log('Collected Info:', JSON.stringify(collectedInfo, null, 2))
+  console.log('==========================')
 
   return {
-    customer_name: customerDetails.name || customerDetails.individual_name || 'Cliente sin nombre',
-    customer_phone: customerDetails.phone || '',
-    customer_address: shipping.address ? 
-      `${shipping.address.line1}, ${shipping.address.city}, ${shipping.address.postal_code}` :
-      'Sin dirección',
+    customer_name: customerName,
+    customer_phone: customerPhone,
+    customer_address: customerAddress,
     delivery_time: metadata.delivery_time || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     notes: metadata.notes || null
   }
