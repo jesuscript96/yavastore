@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
+import { useDeliveryPeopleStore } from '../store/deliveryPeopleStore'
 import { supabase } from '../lib/supabase'
 import { 
   ShoppingCart, 
@@ -9,22 +10,31 @@ import {
   Eye,
   RefreshCw,
   Filter,
-  Search
+  Search,
+  User,
+  Plus
 } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
+import AssignOrderModal from '../components/AssignOrderModal'
 import toast from 'react-hot-toast'
 
 export default function StripeOrders() {
   const { user } = useAuthStore()
+  const { deliveryPeople, fetchDeliveryPeople } = useDeliveryPeopleStore()
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [orderToAssign, setOrderToAssign] = useState(null)
   const [filter, setFilter] = useState('all') // all, pending, assigned, delivered
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     fetchStripeOrders()
-  }, [])
+    if (user?.id) {
+      fetchDeliveryPeople(user.id)
+    }
+  }, [user?.id])
 
   const fetchStripeOrders = async () => {
     setLoading(true)
@@ -130,6 +140,18 @@ export default function StripeOrders() {
       style: 'currency',
       currency: 'EUR'
     }).format(amount)
+  }
+
+  const handleAssignOrder = (order) => {
+    setOrderToAssign(order)
+    setShowAssignModal(true)
+  }
+
+  const handleCloseAssignModal = () => {
+    setShowAssignModal(false)
+    setOrderToAssign(null)
+    // Refresh orders after assignment
+    fetchStripeOrders()
   }
 
   if (loading) {
@@ -355,13 +377,26 @@ export default function StripeOrders() {
                       {formatDate(order.created_at)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => setSelectedOrder(order)}
-                        className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
-                      >
-                        <Eye className="w-4 h-4" />
-                        Ver
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setSelectedOrder(order)}
+                          className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                        >
+                          <Eye className="w-4 h-4" />
+                          Ver
+                        </button>
+                        
+                        {/* Assign Button - Only show for unassigned pending orders */}
+                        {!order.delivery_person_id && order.status === 'pending' && (
+                          <button
+                            onClick={() => handleAssignOrder(order)}
+                            className="text-green-600 hover:text-green-900 flex items-center gap-1"
+                          >
+                            <User className="w-4 h-4" />
+                            Asignar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -450,6 +485,13 @@ export default function StripeOrders() {
           </div>
         </div>
       )}
+
+      {/* Assign Order Modal */}
+      <AssignOrderModal
+        isOpen={showAssignModal}
+        onClose={handleCloseAssignModal}
+        order={orderToAssign}
+      />
     </div>
   )
 }

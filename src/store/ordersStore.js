@@ -235,6 +235,44 @@ export const useOrdersStore = create((set, get) => ({
     return get().orders.filter(order => order.status === status)
   },
 
+  // Unassign order
+  unassignOrder: async (orderId) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .update({
+          delivery_person_id: null,
+          assigned_date: null,
+          assigned_delivery_start_time: null,
+          assigned_delivery_end_time: null,
+          status: ORDER_STATUS.PENDING
+        })
+        .eq('id', orderId)
+        .select(`
+          *,
+          delivery_people (
+            id,
+            name,
+            email,
+            phone
+          )
+        `)
+        .single()
+
+      if (error) throw error
+      
+      set(state => ({
+        orders: state.orders.map(order => 
+          order.id === orderId ? data : order
+        )
+      }))
+      
+      return { data, error: null }
+    } catch (error) {
+      return { data: null, error }
+    }
+  },
+
   // Get unassigned orders
   getUnassignedOrders: () => {
     return get().orders.filter(order => !order.delivery_person_id)
