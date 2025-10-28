@@ -41,15 +41,23 @@ export const useAuthStore = create((set, get) => ({
       })
       
       if (session?.user) {
-        console.log('✅ AuthStore: User found, fetching business data...')
-        try {
-          await get().fetchBusiness(session.user.id)
-          console.log('✅ AuthStore: Business fetch completed successfully')
-        } catch (businessError) {
-          console.error('❌ AuthStore: Business fetch failed during initialization:', businessError)
+        // Verificar si el email está confirmado
+        if (!session.user.email_confirmed_at) {
+          console.log('⚠️ AuthStore: User email not confirmed, signing out...')
+          await supabase.auth.signOut()
+          set({ user: null, business: null, loading: false, initialized: true })
+          console.log('✅ AuthStore: Initialization complete - user signed out due to unconfirmed email')
+        } else {
+          console.log('✅ AuthStore: User found, fetching business data...')
+          try {
+            await get().fetchBusiness(session.user.id)
+            console.log('✅ AuthStore: Business fetch completed successfully')
+          } catch (businessError) {
+            console.error('❌ AuthStore: Business fetch failed during initialization:', businessError)
+          }
+          set({ user: session.user, loading: false, initialized: true })
+          console.log('✅ AuthStore: Initialization complete with user')
         }
-        set({ user: session.user, loading: false, initialized: true })
-        console.log('✅ AuthStore: Initialization complete with user')
       } else {
         console.log('ℹ️ AuthStore: No user found, setting empty state')
         set({ user: null, business: null, loading: false, initialized: true })
@@ -72,7 +80,8 @@ export const useAuthStore = create((set, get) => ({
         options: {
           data: {
             business_name: businessName
-          }
+          },
+          emailRedirectTo: `${import.meta.env.VITE_APP_URL}/login`
         }
       })
 
@@ -148,6 +157,17 @@ export const useAuthStore = create((set, get) => ({
       })
 
       if (error) throw error
+
+      // Verificar si el email está confirmado
+      if (data.user && !data.user.email_confirmed_at) {
+        await supabase.auth.signOut()
+        return { 
+          data: null, 
+          error: { 
+            message: 'Por favor verifica tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.' 
+          } 
+        }
+      }
 
       if (data.user) {
         set({ user: data.user })
@@ -276,15 +296,22 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   const { initialize, fetchBusiness } = useAuthStore.getState()
   
   if (event === 'SIGNED_IN' && session?.user) {
-    console.log('✅ AuthStore: User signed in, fetching business...')
-    try {
-      await fetchBusiness(session.user.id)
-      console.log('✅ AuthStore: Business fetch completed in auth listener')
-    } catch (businessError) {
-      console.error('❌ AuthStore: Business fetch failed in auth listener:', businessError)
+    // Verificar si el email está confirmado
+    if (!session.user.email_confirmed_at) {
+      console.log('⚠️ AuthStore: User signed in but email not confirmed, signing out...')
+      await supabase.auth.signOut()
+      useAuthStore.setState({ user: null, business: null })
+    } else {
+      console.log('✅ AuthStore: User signed in, fetching business...')
+      try {
+        await fetchBusiness(session.user.id)
+        console.log('✅ AuthStore: Business fetch completed in auth listener')
+      } catch (businessError) {
+        console.error('❌ AuthStore: Business fetch failed in auth listener:', businessError)
+      }
+      useAuthStore.setState({ user: session.user })
+      console.log('✅ AuthStore: User state updated')
     }
-    useAuthStore.setState({ user: session.user })
-    console.log('✅ AuthStore: User state updated')
   } else if (event === 'SIGNED_OUT') {
     console.log('🚪 AuthStore: User signed out, clearing state')
     useAuthStore.setState({ user: null, business: null })

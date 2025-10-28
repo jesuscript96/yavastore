@@ -163,3 +163,4 @@ El servicio incluye logging detallado con emojis para facilitar el debugging:
 - ⚠️ Advertencia
 - ❌ Error
 
+

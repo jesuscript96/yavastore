@@ -56,7 +56,7 @@ STRIPE_WEBHOOK_SECRET
 VITE_APP_URL
 ```
 **Valor**: `https://tu-dominio.netlify.app`
-**Descripción**: URL de tu aplicación en producción
+**Descripción**: URL de tu aplicación en producción. IMPORTANTE: Esta URL se usa para redirecciones de verificación de email
 
 ```
 NODE_ENV
