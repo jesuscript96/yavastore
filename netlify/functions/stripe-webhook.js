@@ -177,6 +177,162 @@ async function parseProducts(sessionId) {
 }
 
 /**
+ * Parse products from Stripe invoice line items
+ */
+function parseInvoiceProducts(invoice) {
+  try {
+    const lineItems = invoice.lines?.data || []
+    
+    if (lineItems.length === 0) {
+      console.log('No line items found in invoice')
+      return []
+    }
+
+    return lineItems.map(item => {
+      const unitPrice = (item.amount || 0) / 100 // Convert from cents to dollars
+      const quantity = item.quantity || 1
+      const name = item.description || 'Producto de Suscripción'
+      
+      console.log(`Invoice line item: ${name} - quantity: ${quantity}, amount: ${item.amount} cents, unit price: $${unitPrice}`)
+      
+      return {
+        name,
+        quantity,
+        unitPrice,
+        totalAmount: item.amount || 0
+      }
+    })
+  } catch (error) {
+    console.error('Error parsing invoice products:', error)
+    return []
+  }
+}
+
+/**
+ * Get customer information from Stripe
+ */
+async function getCustomerInfo(customerId) {
+  try {
+    const customer = await stripe.customers.retrieve(customerId)
+    
+    // Extraer información del cliente
+    const customerName = customer.name || customer.email || 'Cliente sin nombre'
+    const customerPhone = customer.phone || ''
+    
+    // Formatear dirección completa
+    let customerAddress = 'Sin dirección'
+    if (customer.address) {
+      const addressParts = [
+        customer.address.line1,
+        customer.address.line2,
+        customer.address.city,
+        customer.address.state,
+        customer.address.postal_code
+      ].filter(Boolean)
+      
+      customerAddress = addressParts.join(', ')
+    }
+    
+    console.log('Customer info retrieved:', {
+      name: customerName,
+      phone: customerPhone,
+      address: customerAddress
+    })
+    
+    return {
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      customer_address: customerAddress
+    }
+  } catch (error) {
+    console.error('Error retrieving customer info:', error)
+    return {
+      customer_name: 'Cliente sin nombre',
+      customer_phone: '',
+      customer_address: 'Sin dirección'
+    }
+  }
+}
+
+/**
+ * Create multiple orders from invoice (one per product unit)
+ */
+async function createOrdersFromInvoice(invoice, businessId = null) {
+  try {
+    console.log('=== CREATING ORDERS FROM INVOICE ===')
+    console.log('Invoice ID:', invoice.id)
+    console.log('Customer ID:', invoice.customer)
+    
+    // Parse products from invoice
+    const invoiceProducts = parseInvoiceProducts(invoice)
+    
+    if (invoiceProducts.length === 0) {
+      console.log('No products found in invoice, skipping order creation')
+      return { success: true, ordersCreated: 0 }
+    }
+    
+    // Get customer information
+    const customerInfo = await getCustomerInfo(invoice.customer)
+    
+    // Get or create default business
+    let finalBusinessId = businessId
+    if (!finalBusinessId) {
+      finalBusinessId = await getDefaultBusiness()
+      console.log('Using default business_id:', finalBusinessId)
+    }
+    
+    const ordersCreated = []
+    
+    // Create individual orders for each product unit
+    for (const product of invoiceProducts) {
+      // Create one order per unit of the product
+      for (let i = 0; i < product.quantity; i++) {
+        const orderData = {
+          business_id: finalBusinessId,
+          customer_name: customerInfo.customer_name,
+          customer_address: customerInfo.customer_address,
+          customer_phone: customerInfo.customer_phone,
+          products: [{
+            name: product.name,
+            quantity: 1,
+            price: product.unitPrice
+          }],
+          total_amount: product.unitPrice,
+          delivery_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Default: tomorrow
+          status: 'pending',
+          source: 'stripe',
+          notes: `Suscripción - Invoice: ${invoice.id}`,
+          stripe_session_id: null // No session for invoice-based orders
+        }
+        
+        const { data, error } = await supabaseAdmin
+          .from('orders')
+          .insert([orderData])
+          .select()
+          .single()
+        
+        if (error) {
+          console.error('Error creating order from invoice:', error)
+          throw error
+        }
+        
+        ordersCreated.push(data.id)
+        console.log(`✅ Order created from invoice: ${data.id} - ${product.name} ($${product.unitPrice})`)
+      }
+    }
+    
+    console.log(`=== INVOICE PROCESSING COMPLETE ===`)
+    console.log(`Total orders created: ${ordersCreated.length}`)
+    console.log('Order IDs:', ordersCreated)
+    
+    return { success: true, ordersCreated: ordersCreated.length, orderIds: ordersCreated }
+  } catch (error) {
+    console.error('Error creating orders from invoice:', error)
+    throw error
+  }
+}
+
+/**
  * Get or create default business for Stripe orders
  */
 async function getDefaultBusiness() {
@@ -369,6 +525,7 @@ export async function handler(event, context) {
         console.log('Event Type:', eventData.type)
         console.log('Business:', business ? `${business.name} (ID: ${business.id})` : 'No business found - using fallback')
         console.log('Session ID:', session.id)
+        console.log('Session Mode:', session.mode)
         console.log('Full Session Object:', JSON.stringify(session, null, 2))
         console.log('Customer Details:', JSON.stringify(session.customer_details, null, 2))
         console.log('Metadata:', JSON.stringify(session.metadata, null, 2))
@@ -378,11 +535,41 @@ export async function handler(event, context) {
         console.log('Payment Status:', session.payment_status)
         console.log('================================')
 
-        // Create the order (con o sin business específico)
+        // Check if this is a subscription checkout
+        if (session.mode === 'subscription') {
+          console.log('📋 Subscription checkout completed - orders will be created when invoice.paid event arrives')
+          console.log(`Subscription ID: ${session.subscription}`)
+          break
+        }
+
+        // Create the order for regular payments (con o sin business específico)
         const businessId = business ? business.id : null
         await createOrder(session, businessId)
 
         console.log(`✅ Order created successfully${business ? ` for business: ${business.name} (ID: ${business.id})` : ' (using fallback business_id)'}`)
+        break
+      }
+
+      case 'invoice.paid': {
+        const invoice = eventData.data.object
+
+        // Log completo del webhook para debugging
+        console.log('=== STRIPE INVOICE.PAID WEBHOOK RECEIVED ===')
+        console.log('Event Type:', eventData.type)
+        console.log('Business:', business ? `${business.name} (ID: ${business.id})` : 'No business found - using fallback')
+        console.log('Invoice ID:', invoice.id)
+        console.log('Customer ID:', invoice.customer)
+        console.log('Subscription ID:', invoice.subscription)
+        console.log('Amount Paid:', invoice.amount_paid)
+        console.log('Currency:', invoice.currency)
+        console.log('Full Invoice Object:', JSON.stringify(invoice, null, 2))
+        console.log('============================================')
+
+        // Create orders from invoice (con o sin business específico)
+        const businessId = business ? business.id : null
+        const result = await createOrdersFromInvoice(invoice, businessId)
+
+        console.log(`✅ Invoice processed successfully - ${result.ordersCreated} orders created${business ? ` for business: ${business.name} (ID: ${business.id})` : ' (using fallback business_id)'}`)
         break
       }
 
