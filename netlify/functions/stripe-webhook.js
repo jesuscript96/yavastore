@@ -10,9 +10,21 @@
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 
+/**
+ * Netlify Function: Stripe Webhook Handler
+ * 
+ * Esta función maneja los webhooks de Stripe para crear órdenes automáticamente
+ * cuando se completa un checkout session.
+ * 
+ * URL: https://tu-dominio.netlify.app/.netlify/functions/stripe-webhook
+ */
+
+import Stripe from 'stripe'
+import { createClient } from '@supabase/supabase-js'
+
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16'
+  apiVersion: '2025-09-30.clover' // Actualizar a la versión más reciente
 })
 
 // Initialize Supabase Admin Client (bypasses RLS)
@@ -389,6 +401,90 @@ async function getDefaultBusiness() {
 }
 
 /**
+ * Create order from subscription checkout session
+ */
+async function createOrderFromSubscription(session, businessId = null) {
+  try {
+    console.log('=== CREATING ORDER FROM SUBSCRIPTION ===')
+    console.log('Session ID:', session.id)
+    console.log('Subscription ID:', session.subscription)
+    console.log('Customer ID:', session.customer)
+    
+    // Extraer información del cliente de la sesión
+    const customerDetails = session.customer_details || {}
+    const collectedInfo = session.collected_information || {}
+    
+    const customerName = collectedInfo.individual_name || 
+                        customerDetails.name || 
+                        customerDetails.individual_name || 
+                        'Cliente Suscripción'
+    
+    const customerPhone = customerDetails.phone || ''
+    
+    // Extraer dirección de shipping
+    const shippingDetails = collectedInfo.shipping_details || {}
+    const shippingAddress = shippingDetails.address || {}
+    
+    let customerAddress = 'Sin dirección'
+    if (shippingAddress.line1) {
+      const addressParts = [
+        shippingAddress.line1,
+        shippingAddress.line2,
+        shippingAddress.city,
+        shippingAddress.state,
+        shippingAddress.postal_code
+      ].filter(Boolean)
+      
+      customerAddress = addressParts.join(', ')
+    }
+    
+    // Obtener o crear business por defecto
+    let finalBusinessId = businessId
+    if (!finalBusinessId) {
+      finalBusinessId = await getDefaultBusiness()
+      console.log('Using default business_id for subscription:', finalBusinessId)
+    }
+    
+    // Crear orden con información de la suscripción
+    const orderData = {
+      business_id: finalBusinessId,
+      customer_name: customerName,
+      customer_address: customerAddress,
+      customer_phone: customerPhone,
+      products: [{
+        name: 'Suscripción Stripe',
+        quantity: 1,
+        price: (session.amount_total || 0) / 100
+      }],
+      total_amount: (session.amount_total || 0) / 100,
+      delivery_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      status: 'pending',
+      source: 'stripe_subscription',
+      notes: `Suscripción inicial - Session: ${session.id}, Subscription: ${session.subscription}`,
+      stripe_session_id: session.id,
+      stripe_subscription_id: session.subscription
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from('orders')
+      .insert([orderData])
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Error creating subscription order:', error)
+      throw error
+    }
+    
+    console.log(`✅ Subscription order created: ${data.id}`)
+    return { success: true, orderId: data.id }
+  } catch (error) {
+    console.error('Error creating order from subscription:', error)
+    throw error
+  }
+}
+
+/**
  * Create order in Supabase
  */
 async function createOrder(session, businessId = null) {
@@ -516,6 +612,18 @@ export async function handler(event, context) {
 
   // Handle the event
   try {
+    console.log('=== WEBHOOK PROCESSING START ===')
+    console.log('Event Type:', eventData.type)
+    console.log('Event ID:', eventData.id)
+    console.log('Business Found:', business ? `${business.name} (ID: ${business.id})` : 'No business found - will use fallback')
+    console.log('Environment Variables Check:', {
+      hasStripeKey: !!process.env.STRIPE_SECRET_KEY,
+      hasSupabaseUrl: !!process.env.VITE_SUPABASE_URL,
+      hasSupabaseKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET
+    })
+    console.log('===============================')
+
     switch (eventData.type) {
       case 'checkout.session.completed': {
         const session = eventData.data.object
@@ -539,6 +647,16 @@ export async function handler(event, context) {
         if (session.mode === 'subscription') {
           console.log('📋 Subscription checkout completed - orders will be created when invoice.paid event arrives')
           console.log(`Subscription ID: ${session.subscription}`)
+          
+          // Para suscripciones, crear una orden inicial con la información de la sesión
+          try {
+            const businessId = business ? business.id : null
+            await createOrderFromSubscription(session, businessId)
+            console.log(`✅ Initial subscription order created${business ? ` for business: ${business.name} (ID: ${business.id})` : ' (using fallback business_id)'}`)
+          } catch (subscriptionError) {
+            console.error('⚠️ Error creating initial subscription order (this is not critical):', subscriptionError.message)
+            // No lanzamos el error porque las suscripciones se manejan principalmente con invoice.paid
+          }
           break
         }
 
@@ -589,11 +707,34 @@ export async function handler(event, context) {
       })
     }
   } catch (error) {
-    console.error('Error processing webhook:', error)
+    console.error('=== WEBHOOK PROCESSING ERROR ===')
+    console.error('Error Type:', error.constructor.name)
+    console.error('Error Message:', error.message)
+    console.error('Error Stack:', error.stack)
+    console.error('Event Data:', JSON.stringify(eventData, null, 2))
+    console.error('Business Data:', JSON.stringify(business, null, 2))
+    console.error('================================')
+    
+    // Intentar devolver una respuesta más específica basada en el tipo de error
+    let statusCode = 500
+    let errorMessage = 'Webhook processing failed'
+    
+    if (error.message.includes('database') || error.message.includes('supabase')) {
+      statusCode = 503
+      errorMessage = 'Database connection error'
+    } else if (error.message.includes('stripe') || error.message.includes('webhook')) {
+      statusCode = 400
+      errorMessage = 'Stripe webhook error'
+    }
+    
     return {
-      statusCode: 500,
+      statusCode,
       headers,
-      body: JSON.stringify({ error: 'Webhook processing failed' })
+      body: JSON.stringify({ 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        eventId: eventData?.id
+      })
     }
   }
 }
