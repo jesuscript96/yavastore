@@ -1,42 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import Layout from './components/Layout'
 import LoadingSpinner from './components/LoadingSpinner'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
-import Orders from './pages/Orders'
-import OrderDetail from './pages/OrderDetail'
-import CreateOrder from './pages/CreateOrder'
-import DeliveryPeople from './pages/DeliveryPeople'
-import CreateDeliveryPerson from './pages/CreateDeliveryPerson'
-import EditDeliveryPerson from './pages/EditDeliveryPerson'
-import Assignments from './pages/Assignments'
-import Statistics from './pages/Statistics'
-import Settings from './pages/Settings'
-import StripeSetupInstructions from './pages/StripeSetupInstructions'
-import StripeOrders from './pages/StripeOrders'
 import toast from 'react-hot-toast'
+
+// Lazy load pages for better performance
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Orders = lazy(() => import('./pages/Orders'))
+const OrderDetail = lazy(() => import('./pages/OrderDetail'))
+const CreateOrder = lazy(() => import('./pages/CreateOrder'))
+const DeliveryPeople = lazy(() => import('./pages/DeliveryPeople'))
+const CreateDeliveryPerson = lazy(() => import('./pages/CreateDeliveryPerson'))
+const EditDeliveryPerson = lazy(() => import('./pages/EditDeliveryPerson'))
+const Assignments = lazy(() => import('./pages/Assignments'))
+const Statistics = lazy(() => import('./pages/Statistics'))
+const Settings = lazy(() => import('./pages/Settings'))
+const StripeSetupInstructions = lazy(() => import('./pages/StripeSetupInstructions'))
+const StripeOrders = lazy(() => import('./pages/StripeOrders'))
 
 function App() {
   const { user, loading, initialized, initialize } = useAuthStore()
   const location = useLocation()
   const [emailConfirmed, setEmailConfirmed] = useState(false)
 
-  // 🔍 DEBUG: Log app state
-  console.log('🎯 App: Current state:', {
-    hasUser: !!user,
-    userId: user?.id,
-    userEmail: user?.email,
-    loading,
-    initialized
-  })
-
   useEffect(() => {
-    console.log('🔄 App: useEffect triggered', { initialized })
     if (!initialized) {
-      console.log('🚀 App: Starting initialization...')
       initialize()
     }
   }, [initialized, initialize])
@@ -48,7 +39,6 @@ function App() {
     const token = urlParams.get('token')
     
     if (type === 'signup' && token) {
-      console.log('📧 App: Email confirmation detected in URL')
       setEmailConfirmed(true)
       toast.success('¡Email verificado exitosamente! Ya puedes iniciar sesión.')
       
@@ -61,12 +51,10 @@ function App() {
   }, [location])
 
   if (loading || !initialized) {
-    console.log('⏳ App: Showing loading spinner')
     return <LoadingSpinner />
   }
 
   if (!user) {
-    console.log('🚪 App: No user, showing login routes')
     return (
       <>
         {emailConfirmed && (
@@ -79,33 +67,36 @@ function App() {
             </div>
           </div>
         )}
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Suspense>
       </>
     )
   }
 
-  console.log('🏠 App: User authenticated, showing main app')
   return (
     <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/orders" element={<Orders />} />
-        <Route path="/orders/new" element={<CreateOrder />} />
-        <Route path="/orders/:id" element={<OrderDetail />} />
-        <Route path="/delivery-people" element={<DeliveryPeople />} />
-        <Route path="/delivery-people/new" element={<CreateDeliveryPerson />} />
-        <Route path="/delivery-people/:id/edit" element={<EditDeliveryPerson />} />
-        <Route path="/assignments" element={<Assignments />} />
-        <Route path="/statistics" element={<Statistics />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/stripe-instructions" element={<StripeSetupInstructions />} />
-        <Route path="/stripe-orders" element={<StripeOrders />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<LoadingSpinner />}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/orders/new" element={<CreateOrder />} />
+          <Route path="/orders/:id" element={<OrderDetail />} />
+          <Route path="/delivery-people" element={<DeliveryPeople />} />
+          <Route path="/delivery-people/new" element={<CreateDeliveryPerson />} />
+          <Route path="/delivery-people/:id/edit" element={<EditDeliveryPerson />} />
+          <Route path="/assignments" element={<Assignments />} />
+          <Route path="/statistics" element={<Statistics />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/stripe-instructions" element={<StripeSetupInstructions />} />
+          <Route path="/stripe-orders" element={<StripeOrders />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </Layout>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { 
   Plus, 
@@ -29,16 +29,15 @@ const statusConfig = {
 }
 
 export default function Orders() {
-  const { business } = useAuthStore()
-  const { 
-    orders, 
-    loading, 
-    filters, 
-    setFilters, 
-    clearFilters,
-    fetchOrders 
-  } = useOrdersStore()
-  const { deliveryPeople, fetchDeliveryPeople } = useDeliveryPeopleStore()
+  const business = useAuthStore(state => state.business)
+  const orders = useOrdersStore(state => state.orders)
+  const loading = useOrdersStore(state => state.loading)
+  const filters = useOrdersStore(state => state.filters)
+  const setFilters = useOrdersStore(state => state.setFilters)
+  const clearFilters = useOrdersStore(state => state.clearFilters)
+  const fetchOrders = useOrdersStore(state => state.fetchOrders)
+  const deliveryPeople = useDeliveryPeopleStore(state => state.deliveryPeople)
+  const fetchDeliveryPeople = useDeliveryPeopleStore(state => state.fetchDeliveryPeople)
   const [searchTerm, setSearchTerm] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
@@ -48,33 +47,41 @@ export default function Orders() {
 
   const watchedFilters = watch()
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (business?.id) {
-      fetchOrders(business.id)
-      fetchDeliveryPeople(business.id)
+      await Promise.all([
+        fetchOrders(business.id),
+        fetchDeliveryPeople(business.id)
+      ])
     }
   }, [business?.id, fetchOrders, fetchDeliveryPeople])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   useEffect(() => {
     setFilters(watchedFilters)
   }, [watchedFilters, setFilters])
 
-  const filteredOrders = orders.filter(order => {
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase()
-      return (
-        order.customer_name?.toLowerCase().includes(searchLower) ||
-        order.customer_phone?.includes(searchTerm) ||
-        order.customer_address?.toLowerCase().includes(searchLower)
-      )
-    }
-    return true
-  })
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase()
+        return (
+          order.customer_name?.toLowerCase().includes(searchLower) ||
+          order.customer_phone?.includes(searchTerm) ||
+          order.customer_address?.toLowerCase().includes(searchLower)
+        )
+      }
+      return true
+    })
+  }, [orders, searchTerm])
 
-  const handleStatusChange = async (orderId, newStatus) => {
+  const handleStatusChange = useCallback(async (orderId, newStatus) => {
     // This would be implemented with the updateOrderStatus function
     console.log('Update order status:', orderId, newStatus)
-  }
+  }, [])
 
   return (
     <div className="space-y-6">

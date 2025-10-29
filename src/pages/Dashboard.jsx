@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { 
   Package, 
@@ -19,44 +19,57 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 export default function Dashboard() {
-  const { business } = useAuthStore()
-  const { orders, fetchOrders } = useOrdersStore()
-  const { deliveryPeople, fetchDeliveryPeople } = useDeliveryPeopleStore()
-  const { stats, fetchStats, loading: statsLoading } = useStatsStore()
+  const business = useAuthStore(state => state.business)
+  const orders = useOrdersStore(state => state.orders)
+  const fetchOrders = useOrdersStore(state => state.fetchOrders)
+  const deliveryPeople = useDeliveryPeopleStore(state => state.deliveryPeople)
+  const fetchDeliveryPeople = useDeliveryPeopleStore(state => state.fetchDeliveryPeople)
+  const stats = useStatsStore(state => state.stats)
+  const fetchStats = useStatsStore(state => state.fetchStats)
+  const statsLoading = useStatsStore(state => state.loading)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (business?.id) {
-        setLoading(true)
-        await Promise.all([
-          fetchOrders(business.id),
-          fetchDeliveryPeople(business.id),
-          fetchStats(business.id)
-        ])
-        setLoading(false)
-      }
+  const loadData = useCallback(async () => {
+    if (business?.id) {
+      setLoading(true)
+      await Promise.all([
+        fetchOrders(business.id),
+        fetchDeliveryPeople(business.id),
+        fetchStats(business.id)
+      ])
+      setLoading(false)
     }
-
-    loadData()
   }, [business?.id, fetchOrders, fetchDeliveryPeople, fetchStats])
 
-  if (loading) {
-    return <LoadingSpinner className="py-12" />
-  }
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
-  const todayOrders = orders.filter(order => {
-    const orderDate = new Date(order.delivery_time)
-    const today = new Date()
-    return orderDate.toDateString() === today.toDateString()
-  })
+  const todayOrders = useMemo(() => {
+    return orders.filter(order => {
+      const orderDate = new Date(order.delivery_time)
+      const today = new Date()
+      return orderDate.toDateString() === today.toDateString()
+    })
+  }, [orders])
 
-  const pendingOrders = orders.filter(order => order.status === 'pending')
-  const assignedOrders = orders.filter(order => order.status === 'assigned')
-  const inRouteOrders = orders.filter(order => order.status === 'in_route')
-  const deliveredToday = todayOrders.filter(order => order.status === 'delivered')
+  const pendingOrders = useMemo(() => 
+    orders.filter(order => order.status === 'pending'), [orders]
+  )
+  
+  const assignedOrders = useMemo(() => 
+    orders.filter(order => order.status === 'assigned'), [orders]
+  )
+  
+  const inRouteOrders = useMemo(() => 
+    orders.filter(order => order.status === 'in_route'), [orders]
+  )
+  
+  const deliveredToday = useMemo(() => 
+    todayOrders.filter(order => order.status === 'delivered'), [todayOrders]
+  )
 
-  const quickStats = [
+  const quickStats = useMemo(() => [
     {
       name: 'Pedidos Hoy',
       value: todayOrders.length,
@@ -85,9 +98,9 @@ export default function Dashboard() {
       color: 'text-success-600',
       bgColor: 'bg-success-100'
     }
-  ]
+  ], [todayOrders.length, pendingOrders.length, inRouteOrders.length, deliveredToday.length])
 
-  const quickActions = [
+  const quickActions = useMemo(() => [
     {
       name: 'Nuevo Pedido',
       href: '/orders/new',
@@ -112,7 +125,11 @@ export default function Dashboard() {
       icon: Users,
       color: 'bg-warning-600 hover:bg-warning-700'
     }
-  ]
+  ], [])
+
+  if (loading) {
+    return <LoadingSpinner className="py-12" />
+  }
 
   return (
     <div className="space-y-6">

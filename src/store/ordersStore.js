@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase, ORDER_STATUS, ORDER_SOURCE } from '../lib/supabase'
+import { logger } from '../lib/logger'
 
 export const useOrdersStore = create((set, get) => ({
   orders: [],
@@ -121,8 +122,8 @@ export const useOrdersStore = create((set, get) => ({
 
   // Assign order to delivery person
   assignOrder: async (orderId, deliveryPersonId, assignedDate, startTime = null, endTime = null) => {
-    console.log('🚀 Starting order assignment process...')
-    console.log('📋 Assignment data:', {
+    logger.log('🚀 Starting order assignment process...')
+    logger.log('📋 Assignment data:', {
       orderId,
       deliveryPersonId,
       assignedDate,
@@ -141,9 +142,9 @@ export const useOrdersStore = create((set, get) => ({
       if (startTime && endTime) {
         updateData.assigned_delivery_start_time = startTime
         updateData.assigned_delivery_end_time = endTime
-        console.log('⏰ Adding time range:', { startTime, endTime })
+        logger.log('⏰ Adding time range:', { startTime, endTime })
       } else {
-        console.log('⏰ No time range provided - using default "anytime"')
+        logger.log('⏰ No time range provided - using default "anytime"')
       }
 
       const { data, error } = await supabase
@@ -162,11 +163,11 @@ export const useOrdersStore = create((set, get) => ({
         .single()
 
       if (error) {
-        console.error('❌ Order assignment failed:', error)
+        logger.error('❌ Order assignment failed:', error)
         throw error
       }
 
-      console.log('✅ Order assigned successfully:', {
+      logger.log('✅ Order assigned successfully:', {
         orderId: data.id,
         deliveryPerson: data.delivery_people?.name,
         assignedDate: data.assigned_date,
@@ -183,7 +184,7 @@ export const useOrdersStore = create((set, get) => ({
       
       return { data, error: null }
     } catch (error) {
-      console.error('💥 Order assignment failed:', error)
+      logger.error('💥 Order assignment failed:', error)
       return { data: null, error }
     }
   },
